@@ -18,7 +18,6 @@ allcle/
 │   ├── ERD.md           # DB 스키마 + PostgreSQL DDL
 │   └── API.md           # REST API 명세 v1 (11개 엔드포인트)
 ├── frontend/            # Next.js + TypeScript (create-next-app으로 초기화)
-│   └── README.md
 └── backend/             # Express + TypeScript
     ├── package.json
     ├── tsconfig.json
@@ -65,9 +64,9 @@ npm install
 cp .env.example .env        # Supabase 키 채우기
 npm run dev                 # http://localhost:4000
 
-# 3. 프론트엔드 (새 터미널)
+# 3. 프론트엔드 (새 터미널, 레포 루트에서)
+# 아래 'Frontend 셋업' 섹션 참고해 create-next-app으로 초기화
 cd frontend
-# frontend/README.md 참고해 create-next-app으로 초기화
 npm run dev                 # http://localhost:3000
 ```
 
@@ -98,17 +97,18 @@ npm run dev                 # http://localhost:3000
 2. `backend/src/routes/`의 스텁을 실제 구현으로 채우기
 3. `frontend/` create-next-app 초기화 + 페이지 7개 라우팅
 
+---
 
-## Frontend 셋업
-# allcle — Frontend (Next.js + TypeScript)
+## 🖥 Frontend 셋업
 
-> 이 폴더는 아직 비어 있어. 아래 명령으로 Next.js 프로젝트를 **이 폴더 안에** 초기화하면 돼.
+> `frontend/` 폴더는 비어 있어. 아래 명령으로 폴더를 만들면서 Next.js 프로젝트를 초기화하면 돼.
 
-## 셋업
+### 초기화
 
 ```bash
-# frontend/ 폴더 안에서 (현재 위치에 생성하므로 마지막 점(.) 주의)
-npx create-next-app@latest . --typescript --tailwind --app --eslint --src-dir
+# 레포 루트에서 실행 (frontend 폴더가 자동으로 생성됨)
+npx create-next-app@latest frontend --typescript --tailwind --app --eslint --src-dir
+cd frontend
 
 # 추가 라이브러리
 npm install framer-motion   # 대기열·전환 애니메이션
@@ -121,7 +121,7 @@ npm install html2canvas     # 결과 공유 카드 이미지 export
 npm run dev     # http://localhost:3000
 ```
 
-## 권장 페이지 구조 (App Router)
+### 권장 페이지 구조 (App Router)
 
 티켓팅 플로우 7단계를 페이지로 매핑:
 
@@ -146,7 +146,7 @@ src/
 └── styles/             # 전역 스타일 (구단별 컬러 토큰 등)
 ```
 
-## 환경변수
+### 환경변수
 
 백엔드 주소를 `.env.local`에 둬:
 
@@ -154,7 +154,6 @@ src/
 NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api
 ```
 
-## API 연동
+### API 연동
 
-엔드포인트 명세는 `../docs/API.md` 참고. 좌석맵 SVG는 `GET /api/stadiums/:id/sections`의 `svgPath`를 그대로 `<path d={svgPath} />`로 렌더링하면 됨.
-
+엔드포인트 명세는 `docs/API.md` 참고. 좌석맵 SVG는 `GET /api/stadiums/:id/sections`의 `svgPath`를 그대로 `<path d={svgPath} />`로 렌더링하면 됨.
