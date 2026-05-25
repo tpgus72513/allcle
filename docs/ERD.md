@@ -68,7 +68,7 @@
 | id | int | PK | |
 | home_team_id | int | FK → teams.id | |
 | away_team_id | int | FK → teams.id | |
-| stadium_id | int | FK → teams.id | |
+| stadium_id | int | FK → stadium.id | |
 | match_date | timestamp | NOT NULL | |
 | difficulty | varchar(10) | NOT NULL | "입문" / "실전" / "지옥" |
 
