@@ -1,4 +1,4 @@
--- allcle 시드 데이터 — 잠실야구장 / LG·두산 기준
+cd allcle-- allcle 시드 데이터 — 잠실야구장 / LG·두산 기준
 -- 데이터 출처: 기획팀 정리 (jamsil_seat_data_2026)
 --
 -- ⚠️ 주의: 이 스크립트는 시드 테이블(stadiums·teams·sections·matches)을
