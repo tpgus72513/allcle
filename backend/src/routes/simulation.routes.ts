@@ -1,69 +1,67 @@
 import { Router } from 'express';
-import { getStartPosition, calculateQueuePosition } from '../services/queue.service';
+import { supabase } from '../config/supabase';
+import { authRequired } from '../middlewares/auth.middleware';
+import { HttpError, ok } from '../utils/apiResponse';
 
 const router = Router();
 
-// POST /api/simulation/start — 시뮬레이션 시작 (매치 선택)
-router.post('/start', async (req, res, next) => {
+/**
+ * Sprint 1: 결과 조회만.
+ * 시뮬레이션 시작/대기열/캡차/좌석/완료는 Sprint 2에서 추가.
+ *
+ * GET /api/v1/simulation/:id/result
+ * 본인 결과만 조회 가능 (다른 사람 결과는 403).
+ */
+router.get('/:id/result', authRequired, async (req, res, next) => {
   try {
-    const { matchId } = req.body;
-    // TODO: simId 생성, matches에서 difficulty 조회, 시작 시각 저장(메모리/세션)
-    const difficulty = '지옥'; // TODO: matches에서 가져오기
-    const { queuePosition, estimatedWaitMs } = getStartPosition(difficulty);
-    res.json({ simId: 'TODO-uuid', queuePosition, estimatedWaitMs });
-  } catch (err) {
-    next(err);
-  }
-});
+    const id = req.params.id; // uuid 문자열 그대로
+    if (!id) throw new HttpError(400, 'INVALID_REQUEST', 'id가 필요합니다.');
 
-// GET /api/simulation/:simId/queue — 대기열 진행 상태 (FE가 1초마다 polling)
-router.get('/:simId/queue', async (req, res, next) => {
-  try {
-    // TODO: simId로 저장해둔 difficulty와 startedAt 조회
-    const difficulty = '지옥';
-    const startedAt = Date.now(); // TODO: 실제 시작 시각으로 교체
-    res.json(calculateQueuePosition(difficulty, startedAt));
-  } catch (err) {
-    next(err);
-  }
-});
+    const { data, error } = await supabase
+      .from('simulation_results')
+      .select(
+        `
+          id,
+          user_id,
+          score,
+          total_time_ms,
+          queue_time_ms,
+          seat_select_time_ms,
+          captcha_time_ms,
+          mistake_count,
+          success,
+          created_at,
+          match:matches ( id, match_date, difficulty,
+                          home:teams!matches_home_team_id_fkey ( name ),
+                          away:teams!matches_away_team_id_fkey ( name ),
+                          stadium:stadiums ( name ) ),
+          section:sections ( name, grade, price )
+        `,
+      )
+      .eq('id', id)
+      .maybeSingle();
 
-// POST /api/simulation/:simId/captcha — CAPTCHA 제출
-router.post('/:simId/captcha', async (req, res, next) => {
-  try {
-    const { answer } = req.body;
-    // TODO: 정답 검증
-    res.json({ success: true, nextStep: 'select-seat' });
-  } catch (err) {
-    next(err);
-  }
-});
+    if (error) throw new HttpError(500, 'INTERNAL_ERROR', error.message);
+    if (!data) throw new HttpError(404, 'NOT_FOUND', '시뮬레이션 결과를 찾을 수 없습니다.');
+    if (data.user_id !== req.user!.id) {
+      throw new HttpError(403, 'FORBIDDEN', '본인의 결과만 조회할 수 있습니다.');
+    }
 
-// POST /api/simulation/:simId/select-seat — 좌석(구역) 선택 시도
-router.post('/:simId/select-seat', async (req, res, next) => {
-  try {
-    const { sectionId } = req.body;
-    // TODO: 매진 여부 판정 (popularity 기반), 성공 시 좌석 배정
-    res.json({ success: false, seatInfo: null, soldOutSections: [] });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// POST /api/simulation/:simId/payment — 결제 시뮬레이션 (3분 타이머)
-router.post('/:simId/payment', async (req, res, next) => {
-  try {
-    res.json({ success: true, paymentTime: 0 });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// POST /api/simulation/:simId/complete — 종료 + 채점
-router.post('/:simId/complete', async (req, res, next) => {
-  try {
-    // TODO: 채점(소요시간 + 실수 + 좌석등급) 후 simulation_results INSERT
-    res.json({ score: 0, breakdown: {}, rank: 'TODO' });
+    res.json(
+      ok({
+        simulationId: data.id,
+        score: data.score,
+        totalTimeMs: data.total_time_ms,
+        queueTimeMs: data.queue_time_ms,
+        seatSelectTimeMs: data.seat_select_time_ms,
+        captchaTimeMs: data.captcha_time_ms,
+        mistakeCount: data.mistake_count,
+        isSuccess: data.success,
+        completedAt: data.created_at,
+        match: data.match,
+        section: data.section,
+      }),
+    );
   } catch (err) {
     next(err);
   }

@@ -1,8 +1,7 @@
-import 'dotenv/config';
 import app from './app';
+import { env } from './config/env';
 
-const PORT = process.env.PORT || 4000;
-
-app.listen(PORT, () => {
-  console.log(`성공히히히allcle backend running on http://localhost:${PORT}`);
+app.listen(env.PORT, () => {
+  // eslint-disable-next-line no-console
+  console.log(`🚀 allcle backend ready on http://localhost:${env.PORT} (${env.NODE_ENV})`);
 });

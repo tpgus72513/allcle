@@ -1,22 +1,32 @@
 import express from 'express';
-import cors from 'cors';
-import routes from './routes';
-import { errorHandler } from './middlewares/errorHandler';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import { corsMiddleware } from './config/cors';
+import { env } from './config/env';
+import { errorMiddleware } from './middlewares/error.middleware';
+import { notFoundMiddleware } from './middlewares/notFound.middleware';
+import apiV1 from './routes';
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+// 보안 헤더 — XSS, clickjacking 등 기본 방어
+app.use(helmet());
 
-// 헬스체크
-app.get('/health', (_req, res) => {
-  res.json({ ok: true });
-});
+// CORS — 라우터보다 먼저 와야 프리플라이트 처리 가능
+app.use(corsMiddleware);
 
-// /api 하위로 모든 라우트 등록
-app.use('/api', routes);
+// JSON 파싱
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// 에러 핸들러는 항상 맨 마지막
-app.use(errorHandler);
+// 로깅 — 개발은 dev, 운영은 combined
+app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// API v1
+app.use('/api/v1', apiV1);
+
+// 404 → 에러 핸들러 순서 중요
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
 
 export default app;
