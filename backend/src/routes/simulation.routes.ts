@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../config/supabase';
 import { authRequired } from '../middlewares/auth.middleware';
 import { HttpError, ok } from '../utils/apiResponse';
+import { getQueuePosition, type Difficulty } from '../services/queue.service';
 
 const router = Router();
 
@@ -209,6 +210,75 @@ router.get('/:id/result', authRequired, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ============================================================
+// POST /api/v1/simulation/:id/queue/enter
+// 큐 진입 시각 기록. 본인 IN_PROGRESS 시뮬에만 1회 허용.
+// (이미 진입했으면 409로 막아서 "새로고침으로 시간 리셋" 방지)
+// ============================================================
+router.post('/:id/queue/enter', authRequired, async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const id = req.params.id;
+
+    // 본인 IN_PROGRESS 시뮬인지 + 아직 큐 진입 전인지 확인
+    const { data: sim, error: e1 } = await supabase
+      .from('simulations')
+      .select('id, queue_entered_at, match:matches(difficulty)')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .eq('status', 'IN_PROGRESS')
+      .maybeSingle();
+    if (e1) throw new HttpError(500, 'INTERNAL_ERROR', e1.message);
+    if (!sim) throw new HttpError(404, 'NOT_FOUND', '진행 중 시뮬을 찾을 수 없습니다.');
+    if (sim.queue_entered_at) {
+      throw new HttpError(409, 'CONFLICT', '이미 대기열에 진입했습니다.');
+    }
+
+    const nowIso = new Date().toISOString();
+    const { error: e2 } = await supabase
+      .from('simulations')
+      .update({ queue_entered_at: nowIso })
+      .eq('id', id);
+    if (e2) throw new HttpError(500, 'INTERNAL_ERROR', e2.message);
+
+    const difficulty = (sim as any).match.difficulty as Difficulty;
+    const status = getQueuePosition(nowIso, difficulty);
+
+    res.json(ok({ queueEnteredAt: nowIso, ...status }));
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// GET /api/v1/simulation/:id/queue
+// 폴링용 — 1초 주기로 FE가 호출. 매번 결정론적 계산해서 응답.
+// ============================================================
+router.get('/:id/queue', authRequired, async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const id = req.params.id;
+
+    const { data: sim, error } = await supabase
+      .from('simulations')
+      .select('id, status, queue_entered_at, match:matches(difficulty)')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw new HttpError(500, 'INTERNAL_ERROR', error.message);
+    if (!sim) throw new HttpError(404, 'NOT_FOUND', '시뮬을 찾을 수 없습니다.');
+    if (sim.status !== 'IN_PROGRESS') {
+      throw new HttpError(409, 'CONFLICT', '진행 중이 아닙니다.');
+    }
+    if (!sim.queue_entered_at) {
+      throw new HttpError(409, 'CONFLICT', '아직 대기열에 진입하지 않았습니다.');
+    }
+
+    const difficulty = (sim as any).match.difficulty as Difficulty;
+    const status = getQueuePosition(sim.queue_entered_at, difficulty);
+
+    res.json(ok(status));
+  } catch (err) { next(err); }
 });
 
 export default router;
