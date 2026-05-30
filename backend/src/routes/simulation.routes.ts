@@ -16,6 +16,7 @@ import {
   evaluateSections,
 } from '../services/seatAvailability.service';
 import { calculateScore } from '../services/scoring.service';
+import { getQueuePosition, type Difficulty } from '../services/queue.service';
 
 const router = Router();
 
@@ -82,6 +83,37 @@ router.post('/', authRequired, async (req, res, next) => {
         },
       }),
     );
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================
+// GET /api/v1/simulation/:id/queue  — 대기열 polling (1초마다 FE 호출)
+// ============================================================
+
+router.get('/:id/queue', authRequired, async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const id = req.params.id;
+
+    const { data, error } = await supabase
+      .from('simulations')
+      .select('id, user_id, status, started_at, match:matches(difficulty)')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw new HttpError(500, 'INTERNAL_ERROR', error.message);
+    if (!data) throw new HttpError(404, 'NOT_FOUND', '시뮬을 찾을 수 없습니다.');
+    if (data.user_id !== userId) throw new HttpError(403, 'FORBIDDEN', '본인의 시뮬이 아닙니다.');
+    if (data.status !== 'IN_PROGRESS') {
+      throw new HttpError(409, 'NOT_IN_PROGRESS', `현재 상태(${data.status})에선 대기열을 조회할 수 없습니다.`);
+    }
+
+    const difficulty = ((data as any).match?.difficulty ?? '실전') as Difficulty;
+    const status = getQueuePosition(data.started_at, difficulty);
+
+    res.json(ok(status));
   } catch (err) {
     next(err);
   }
@@ -749,7 +781,6 @@ async function suggestAlternatives(args: {
 
   return sections
     .map((s) => ({
-      sectionId: s.id,
       name: s.name,
       ...evaluateSection({
         seed: args.seed,
